@@ -133,6 +133,23 @@
             font-weight: bold;
         }
 
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 5px;
+            background-color: #555;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #FFD700;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
         /* Play/Pause Button */
         .play-pause-button {
             background-color: transparent;
@@ -163,60 +180,6 @@
             outline: none;
         }
 
-        /* Waveform Container */
-        #waveformContainer {
-            background-color: #242424;
-            padding: 15px;
-            border-top: 2px solid #FFD700;
-            height: 200px;
-            width: 100%;
-            border-radius: 8px;
-            position: fixed;
-            bottom: 0;
-            display: block;
-            box-shadow: 0 -4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        #trackInfo {
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #FFD700;
-        }
-
-        #timeInfo {
-            text-align: center;
-            font-size: 0.9em;
-            color: #FFD700;
-        }
-
-        #waveform {
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-
-        /* Waveform Play/Pause Icon */
-        #waveformPlayPause {
-            text-align: center;
-            margin-top: 10px;
-        }
-
-        #waveformPlayPause button {
-            background-color: transparent;
-            border: none;
-            color: #FFD700;
-            cursor: pointer;
-            font-size: 2em;
-            transition: color 0.3s, transform 0.2s;
-        }
-
-        #waveformPlayPause button:hover {
-            color: #ffffff;
-            transform: scale(1.1);
-        }
-
         /* Responsive Design */
         @media (max-width: 768px) {
             .go-button {
@@ -242,7 +205,7 @@
         <div class="tab" role="button" aria-label="Edit Menu">
             Edit
             <div class="dropdown-content">
-                <button onclick="reorderQueue()">Reorder Queue</button>
+                <button onclick="renumberQueue()">Renumber Queue</button>
             </div>
         </div>
         <button class="go-button" onclick="playNextTrackSimultaneously()" aria-label="Play next track">Go</button>
@@ -256,6 +219,7 @@
                     <th>Track Name</th>
                     <th>Play/Pause</th>
                     <th>Notes</th>
+                    <th>Progress</th>
                 </tr>
             </thead>
             <tbody>
@@ -264,22 +228,11 @@
         </table>
     </div>
 
-    <div id="waveformContainer">
-        <div id="trackInfo">No track loaded</div>
-        <div id="timeInfo">Duration: 00:00 | Time Left: 00:00</div>
-        <div id="waveform"><div></div></div>
-        <div id="waveformPlayPause">
-            <button onclick="toggleWaveformPlayPause()">
-                <i class="fas fa-play"></i>
-            </button>
-        </div>
-    </div>
-
     <script>
         let tracks = [];
         let wavesurfer = null;
-        let nextWavesurfer = null; // For simultaneous playback
         let currentIndex = -1;
+        let interval = null;
 
         // Handle file input changes
         document.getElementById('fileInput').addEventListener('change', async (event) => {
@@ -289,7 +242,9 @@
                     id: tracks.length,
                     name: file.name,
                     file: file, // Store the file object directly
-                    notes: ''
+                    notes: '',
+                    duration: 0,
+                    progress: 0
                 };
                 tracks.push(track);
             }
@@ -322,15 +277,11 @@
             URL.revokeObjectURL(url);
         }
 
-        // Reorder the queue
-        function reorderQueue() {
-            const queueList = document.querySelector('#queueList tbody');
-            const rows = Array.from(queueList.querySelectorAll('tr'));
-            const newOrder = rows.map(row => {
-                const index = parseInt(row.querySelector('td').innerText) - 1;
-                return tracks[index];
+        // Renumber the queue
+        function renumberQueue() {
+            tracks.forEach((track, index) => {
+                track.id = index;
             });
-            tracks = newOrder;
             updateQueueList();
         }
 
@@ -348,6 +299,7 @@
                             <i class="fas ${wavesurfer && currentIndex === index && wavesurfer.isPlaying() ? 'fa-pause' : 'fa-play'}"></i>
                         </button></td>
                     <td><input type="text" class="notes-input" placeholder="Add notes..." onchange="updateNotes(${index}, this.value)" value="${track.notes}" aria-label="Track notes"></td>
+                    <td><div class="progress-bar"><div class="progress-bar-fill" style="width: ${track.progress}%"></div></div></td>
                 `;
                 queueList.appendChild(row);
             });
@@ -368,53 +320,21 @@
             }
         }
 
-        // Toggle play/pause for the waveform player
-        function toggleWaveformPlayPause() {
-            if (wavesurfer) {
-                wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
-                updateWaveformPlayPauseIcon();
-            }
-        }
-
-        // Update the waveform play/pause icon
-        function updateWaveformPlayPauseIcon() {
-            const playPauseButton = document.querySelector('#waveformPlayPause button i');
-            if (wavesurfer && wavesurfer.isPlaying()) {
-                playPauseButton.classList.remove('fa-play');
-                playPauseButton.classList.add('fa-pause');
-            } else {
-                playPauseButton.classList.remove('fa-pause');
-                playPauseButton.classList.add('fa-play');
-            }
-        }
-
         // Play the next track simultaneously
         function playNextTrackSimultaneously() {
             if (currentIndex + 1 < tracks.length) {
-                if (wavesurfer && wavesurfer.isPlaying()) {
-                    // Play the next track simultaneously
-                    playTrack(currentIndex + 1, true);
-                } else {
-                    // If no track is playing, just play the next track
-                    playTrack(currentIndex + 1);
-                }
+                playTrack(currentIndex + 1);
             } else {
                 alert("No more tracks in the queue.");
             }
         }
 
         // Play a specific track
-        function playTrack(index, simultaneous = false) {
+        function playTrack(index) {
             // Destroy the previous wavesurfer instance if it exists
             if (wavesurfer) {
                 wavesurfer.destroy();
                 wavesurfer = null;
-            }
-
-            // Destroy the nextWavesurfer instance if it exists
-            if (nextWavesurfer) {
-                nextWavesurfer.destroy();
-                nextWavesurfer = null;
             }
 
             currentIndex = index;
@@ -423,58 +343,53 @@
             const track = tracks[index];
             const audioSrc = URL.createObjectURL(track.file);
 
-            if (simultaneous) {
-                // Create a new WaveSurfer instance for simultaneous playback
-                nextWavesurfer = WaveSurfer.create({
-                    container: '#waveform',
-                    waveColor: '#555',
-                    progressColor: '#FFD700',
-                    cursorColor: '#FFD700',
-                    barWidth: 2,
-                    barRadius: 3,
-                    height: 80,
-                    responsive: true
-                });
+            wavesurfer = WaveSurfer.create({
+                container: '#waveform',
+                waveColor: '#555',
+                progressColor: '#FFD700',
+                cursorColor: '#FFD700',
+                barWidth: 2,
+                barRadius: 3,
+                height: 80,
+                responsive: true
+            });
 
-                nextWavesurfer.load(audioSrc);
-                nextWavesurfer.play();
-            } else {
-                wavesurfer = WaveSurfer.create({
-                    container: '#waveform',
-                    waveColor: '#555',
-                    progressColor: '#FFD700',
-                    cursorColor: '#FFD700',
-                    barWidth: 2,
-                    barRadius: 3,
-                    height: 80,
-                    responsive: true
-                });
+            wavesurfer.load(audioSrc);
 
-                wavesurfer.load(audioSrc);
-                document.getElementById('trackInfo').innerText = track.name;
+            wavesurfer.on('ready', () => {
+                track.duration = wavesurfer.getDuration();
+                wavesurfer.play();
+                updateQueueList();
+                startProgressUpdate();
+            });
 
-                wavesurfer.on('ready', () => {
-                    updateTimeInfo(wavesurfer.getDuration(), 0);
-                    wavesurfer.play();
-                    updateWaveformPlayPauseIcon();
-                });
+            wavesurfer.on('finish', () => {
+                stopProgressUpdate();
+                playNextTrackSimultaneously();
+            });
 
-                wavesurfer.on('finish', () => {
-                    updateWaveformPlayPauseIcon();
-                });
-
-                wavesurfer.on('error', (error) => {
-                    console.error("Error loading track:", error);
-                    alert("Error loading track. Please check the file format.");
-                });
-            }
+            wavesurfer.on('error', (error) => {
+                console.error("Error loading track:", error);
+                alert("Error loading track. Please check the file format.");
+            });
         }
 
-        // Update time information
-        function updateTimeInfo(duration, currentTime) {
-            const remainingTime = Math.max(0, duration - currentTime);
-            const formatTime = (time) => new Date(time * 1000).toISOString().substring(14, 19);
-            document.getElementById('timeInfo').innerText = `Duration: ${formatTime(duration)} | Time Left: ${formatTime(remainingTime)}`;
+        // Start updating progress
+        function startProgressUpdate() {
+            interval = setInterval(() => {
+                if (wavesurfer) {
+                    const currentTime = wavesurfer.getCurrentTime();
+                    const duration = wavesurfer.getDuration();
+                    const progress = (currentTime / duration) * 100;
+                    tracks[currentIndex].progress = progress;
+                    updateQueueList();
+                }
+            }, 100);
+        }
+
+        // Stop updating progress
+        function stopProgressUpdate() {
+            clearInterval(interval);
         }
 
         // Bind Enter key to the "Go" button
@@ -488,7 +403,10 @@
         document.addEventListener('keydown', (event) => {
             if (event.key === ' ') { // Spacebar key
                 event.preventDefault(); // Prevent default spacebar behavior (scrolling)
-                toggleWaveformPlayPause();
+                if (wavesurfer) {
+                    wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
+                    updateQueueList();
+                }
             }
         });
     </script>
