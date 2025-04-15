@@ -180,6 +180,14 @@
             outline: none;
         }
 
+        /* Waveform container */
+        #waveform {
+            margin-top: 20px;
+            border-radius: 8px;
+            background: #292929;
+            padding: 10px;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .go-button {
@@ -226,6 +234,9 @@
                 <!-- Rows will be populated dynamically -->
             </tbody>
         </table>
+        
+        <!-- Added waveform container -->
+        <div id="waveform"></div>
     </div>
 
     <script>
@@ -394,18 +405,18 @@
 
         // Bind Enter key to the "Go" button
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                playNextTrackSimultaneously();
-            }
-        });
-
-        // Bind Spacebar to play/pause
-        document.addEventListener('keydown', (event) => {
-            if (event.key === ' ') { // Spacebar key
-                event.preventDefault(); // Prevent default spacebar behavior (scrolling)
-                if (wavesurfer) {
-                    wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
-                    updateQueueList();
+            // Check if we're not in an input field
+            if (event.target.tagName.toLowerCase() !== 'input') {
+                if (event.key === 'Enter') {
+                    playNextTrackSimultaneously();
+                }
+                
+                // Bind Spacebar to play/pause
+                if (event.key === ' ') {
+                    event.preventDefault(); // Prevent default spacebar behavior (scrolling)
+                    if (wavesurfer && currentIndex >= 0) {
+                        toggleTrack(currentIndex);
+                    }
                 }
             }
         });
