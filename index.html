@@ -133,6 +133,14 @@
             font-weight: bold;
         }
 
+        .queue-item.active .play-pause-button {
+            color: #121212;
+        }
+
+        .queue-item.active .progress-bar-fill {
+            background-color: #121212;
+        }
+
         /* Progress Bar */
         .progress-bar {
             width: 100%;
@@ -158,6 +166,8 @@
             cursor: pointer;
             font-size: 1.2em;
             transition: color 0.3s;
+            width: 100%;
+            text-align: left;
         }
 
         .play-pause-button:hover {
@@ -323,12 +333,18 @@
 
         // Toggle play/pause for a track
         function toggleTrack(index) {
-            if (wavesurfer && currentIndex === index) {
-                wavesurfer.isPlaying() ? wavesurfer.pause() : wavesurfer.play();
-                updateQueueList(); // Update the play/pause icon
+            if (currentIndex === index && wavesurfer) {
+                // Toggle play/pause for current track
+                if (wavesurfer.isPlaying()) {
+                    wavesurfer.pause();
+                } else {
+                    wavesurfer.play();
+                }
             } else {
+                // Play a new track
                 playTrack(index);
             }
+            updateQueueList();
         }
 
         // Play the next track simultaneously
@@ -345,7 +361,7 @@
             // Destroy the previous wavesurfer instance if it exists
             if (wavesurfer) {
                 wavesurfer.destroy();
-                wavesurfer = null;
+                clearInterval(interval);
             }
 
             currentIndex = index;
@@ -387,20 +403,29 @@
 
         // Start updating progress
         function startProgressUpdate() {
+            stopProgressUpdate(); // Clear any existing interval
             interval = setInterval(() => {
-                if (wavesurfer) {
+                if (wavesurfer && currentIndex >= 0) {
                     const currentTime = wavesurfer.getCurrentTime();
                     const duration = wavesurfer.getDuration();
                     const progress = (currentTime / duration) * 100;
                     tracks[currentIndex].progress = progress;
-                    updateQueueList();
+                    
+                    // Update only the progress bar for better performance
+                    const progressBars = document.querySelectorAll('.progress-bar-fill');
+                    if (progressBars[currentIndex]) {
+                        progressBars[currentIndex].style.width = `${progress}%`;
+                    }
                 }
             }, 100);
         }
 
         // Stop updating progress
         function stopProgressUpdate() {
-            clearInterval(interval);
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
         }
 
         // Bind Enter key to the "Go" button
@@ -414,8 +439,10 @@
                 // Bind Spacebar to play/pause
                 if (event.key === ' ') {
                     event.preventDefault(); // Prevent default spacebar behavior (scrolling)
-                    if (wavesurfer && currentIndex >= 0) {
+                    if (currentIndex >= 0) {
                         toggleTrack(currentIndex);
+                    } else if (tracks.length > 0) {
+                        playTrack(0);
                     }
                 }
             }
