@@ -141,21 +141,40 @@
             background-color: #121212;
         }
 
+        .queue-item.next-track .progress-bar-fill {
+            background-color: rgba(255, 215, 0, 0.5); /* 50% opacity gold */
+        }
+
         /* Progress Bar */
-        .progress-bar {
+        .progress-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
             width: 100%;
+        }
+
+        .progress-bar {
+            flex-grow: 1;
             height: 5px;
             background-color: #555;
             border-radius: 2px;
             overflow: hidden;
             margin-top: 5px;
+            position: relative;
         }
 
         .progress-bar-fill {
             height: 100%;
-            background-color: #FFD700;
+            background-color: #4CAF50; /* Green progress bar */
             width: 0%;
             transition: width 0.1s linear;
+        }
+
+        .time-left {
+            font-size: 0.8em;
+            color: #aaa;
+            min-width: 50px;
+            text-align: right;
         }
 
         /* Play/Pause Button */
@@ -190,6 +209,20 @@
             outline: none;
         }
 
+        /* Track number editing */
+        .track-number {
+            cursor: pointer;
+        }
+
+        .track-number-input {
+            background-color: #333;
+            border: 1px solid #FFD700;
+            color: #ffffff;
+            width: 30px;
+            text-align: center;
+            border-radius: 4px;
+        }
+
         /* Waveform container */
         #waveform {
             margin-top: 20px;
@@ -203,7 +236,6 @@
             .go-button {
                 position: static;
                 margin-top: 10px;
-                width: 100%;
             }
         }
     </style>
@@ -253,6 +285,7 @@
         let tracks = [];
         let wavesurfer = null;
         let currentIndex = -1;
+        let nextIndex = -1;
         let interval = null;
 
         // Handle file input changes
@@ -262,14 +295,15 @@
                 const track = {
                     id: tracks.length,
                     name: file.name,
-                    file: file, // Store the file object directly
+                    file: file,
                     notes: '',
                     duration: 0,
-                    progress: 0
+                    progress: 0,
+                    timeLeft: '0:00'
                 };
                 tracks.push(track);
             }
-            updateQueueList(); // Update the queue list after importing files
+            updateQueueList();
         });
 
         // Handle project import
@@ -280,7 +314,7 @@
                 reader.onload = async (e) => {
                     const content = e.target.result;
                     tracks = JSON.parse(content);
-                    updateQueueList(); // Update the queue list after loading the project
+                    updateQueueList();
                 };
                 reader.readAsText(file);
             }
@@ -309,21 +343,100 @@
         // Update the queue list UI
         function updateQueueList() {
             const queueList = document.querySelector('#queueList tbody');
-            queueList.innerHTML = ''; // Clear the existing rows
+            queueList.innerHTML = '';
             tracks.forEach((track, index) => {
                 const row = document.createElement('tr');
-                row.className = index === currentIndex ? 'queue-item active' : 'queue-item';
+                row.className = index === currentIndex ? 'queue-item active' : 
+                                index === nextIndex ? 'queue-item next-track' : 'queue-item';
+                
                 row.innerHTML = `
-                    <td>${index + 1}</td>
+                    <td>
+                        <span class="track-number" onclick="editTrackNumber(${index})">${index + 1}</span>
+                    </td>
                     <td>${track.name}</td>
-                    <td><button class="play-pause-button" onclick="toggleTrack(${index})" aria-label="Play/Pause track">
+                    <td>
+                        <button class="play-pause-button" onclick="toggleTrack(${index})" aria-label="Play/Pause track">
                             <i class="fas ${wavesurfer && currentIndex === index && wavesurfer.isPlaying() ? 'fa-pause' : 'fa-play'}"></i>
-                        </button></td>
-                    <td><input type="text" class="notes-input" placeholder="Add notes..." onchange="updateNotes(${index}, this.value)" value="${track.notes}" aria-label="Track notes"></td>
-                    <td><div class="progress-bar"><div class="progress-bar-fill" style="width: ${track.progress}%"></div></div></td>
+                        </button>
+                    </td>
+                    <td>
+                        <input type="text" class="notes-input" placeholder="Add notes..." 
+                               onchange="updateNotes(${index}, this.value)" value="${track.notes}" 
+                               aria-label="Track notes">
+                    </td>
+                    <td>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill" style="width: ${track.progress}%"></div>
+                            </div>
+                            <span class="time-left">${track.timeLeft}</span>
+                        </div>
+                    </td>
                 `;
                 queueList.appendChild(row);
             });
+        }
+
+        // Edit track number
+        function editTrackNumber(index) {
+            const cell = document.querySelector(`#queueList tbody tr:nth-child(${index + 1}) td:first-child`);
+            if (!cell) return;
+            
+            const currentNumber = index + 1;
+            cell.innerHTML = `
+                <input type="number" class="track-number-input" value="${currentNumber}" 
+                       min="1" max="${tracks.length}" 
+                       onblur="saveTrackNumber(${index}, this.value)"
+                       onkeydown="handleTrackNumberKey(event, ${index}, this)">
+            `;
+            
+            const input = cell.querySelector('input');
+            input.select();
+            input.focus();
+        }
+
+        // Save track number after editing
+        function saveTrackNumber(oldIndex, newNumber) {
+            newNumber = parseInt(newNumber);
+            if (isNaN(newNumber) return;
+            
+            newNumber = Math.max(1, Math.min(tracks.length, newNumber)) - 1;
+            if (newNumber === oldIndex) {
+                updateQueueList();
+                return;
+            }
+            
+            // Move the track to the new position
+            const trackToMove = tracks.splice(oldIndex, 1)[0];
+            tracks.splice(newNumber, 0, trackToMove);
+            
+            // Update currentIndex if needed
+            if (currentIndex === oldIndex) {
+                currentIndex = newNumber;
+            } else if (currentIndex > oldIndex && currentIndex <= newNumber) {
+                currentIndex--;
+            } else if (currentIndex < oldIndex && currentIndex >= newNumber) {
+                currentIndex++;
+            }
+            
+            // Update nextIndex if needed
+            if (nextIndex === oldIndex) {
+                nextIndex = newNumber;
+            } else if (nextIndex > oldIndex && nextIndex <= newNumber) {
+                nextIndex--;
+            } else if (nextIndex < oldIndex && nextIndex >= newNumber) {
+                nextIndex++;
+            }
+            
+            updateQueueList();
+        }
+
+        // Handle keyboard events for track number editing
+        function handleTrackNumberKey(event, index, input) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                input.blur();
+            }
         }
 
         // Update track notes
@@ -334,14 +447,12 @@
         // Toggle play/pause for a track
         function toggleTrack(index) {
             if (currentIndex === index && wavesurfer) {
-                // Toggle play/pause for current track
                 if (wavesurfer.isPlaying()) {
                     wavesurfer.pause();
                 } else {
                     wavesurfer.play();
                 }
             } else {
-                // Play a new track
                 playTrack(index);
             }
             updateQueueList();
@@ -350,7 +461,8 @@
         // Play the next track simultaneously
         function playNextTrackSimultaneously() {
             if (currentIndex + 1 < tracks.length) {
-                playTrack(currentIndex + 1);
+                nextIndex = currentIndex + 1;
+                updateQueueList();
             } else {
                 alert("No more tracks in the queue.");
             }
@@ -358,13 +470,13 @@
 
         // Play a specific track
         function playTrack(index) {
-            // Destroy the previous wavesurfer instance if it exists
             if (wavesurfer) {
                 wavesurfer.destroy();
                 clearInterval(interval);
             }
 
             currentIndex = index;
+            nextIndex = -1;
             updateQueueList();
 
             const track = tracks[index];
@@ -392,7 +504,11 @@
 
             wavesurfer.on('finish', () => {
                 stopProgressUpdate();
-                playNextTrackSimultaneously();
+                if (nextIndex >= 0) {
+                    playTrack(nextIndex);
+                } else if (currentIndex + 1 < tracks.length) {
+                    playTrack(currentIndex + 1);
+                }
             });
 
             wavesurfer.on('error', (error) => {
@@ -403,7 +519,7 @@
 
         // Start updating progress
         function startProgressUpdate() {
-            stopProgressUpdate(); // Clear any existing interval
+            stopProgressUpdate();
             interval = setInterval(() => {
                 if (wavesurfer && currentIndex >= 0) {
                     const currentTime = wavesurfer.getCurrentTime();
@@ -411,10 +527,19 @@
                     const progress = (currentTime / duration) * 100;
                     tracks[currentIndex].progress = progress;
                     
-                    // Update only the progress bar for better performance
-                    const progressBars = document.querySelectorAll('.progress-bar-fill');
-                    if (progressBars[currentIndex]) {
-                        progressBars[currentIndex].style.width = `${progress}%`;
+                    // Calculate time left
+                    const timeLeft = duration - currentTime;
+                    const minutes = Math.floor(timeLeft / 60);
+                    const seconds = Math.floor(timeLeft % 60);
+                    tracks[currentIndex].timeLeft = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                    
+                    // Update progress bar and time left
+                    const row = document.querySelector(`#queueList tbody tr:nth-child(${currentIndex + 1})`);
+                    if (row) {
+                        const progressBar = row.querySelector('.progress-bar-fill');
+                        const timeLeftElement = row.querySelector('.time-left');
+                        if (progressBar) progressBar.style.width = `${progress}%`;
+                        if (timeLeftElement) timeLeftElement.textContent = tracks[currentIndex].timeLeft;
                     }
                 }
             }, 100);
@@ -428,17 +553,20 @@
             }
         }
 
-        // Bind Enter key to the "Go" button
+        // Keyboard controls
         document.addEventListener('keydown', (event) => {
-            // Check if we're not in an input field
-            if (event.target.tagName.toLowerCase() !== 'input') {
+            if (event.target.tagName.toLowerCase() !== 'input' || event.target.classList.contains('track-number-input')) {
                 if (event.key === 'Enter') {
-                    playNextTrackSimultaneously();
+                    event.preventDefault();
+                    if (event.target.classList.contains('track-number-input')) {
+                        event.target.blur();
+                    } else {
+                        playNextTrackSimultaneously();
+                    }
                 }
                 
-                // Bind Spacebar to play/pause
                 if (event.key === ' ') {
-                    event.preventDefault(); // Prevent default spacebar behavior (scrolling)
+                    event.preventDefault();
                     if (currentIndex >= 0) {
                         toggleTrack(currentIndex);
                     } else if (tracks.length > 0) {
