@@ -1,169 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sound Queue Manager</title>
     <script src="https://unpkg.com/wavesurfer.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* General Styles */
+        /* Dark Theme Base */
         body {
             background-color: #121212;
             color: #ffffff;
-            font-family: "Arial", sans-serif;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            margin: 0;
         }
 
-        /* Top Bar */
+        /* Top Navigation Bar */
         .top-bar {
+            background-color: #1c1c1c;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background-color: #1c1c1c;
-            padding: 10px 20px;
             border-bottom: 2px solid #FFD700;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
-        .tab {
+        /* Dropdown Menus */
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-btn {
+            background-color: transparent;
             color: #FFD700;
+            border: none;
+            padding: 8px 15px;
+            font-size: 16px;
             cursor: pointer;
             font-weight: bold;
-            padding: 5px 15px;
-            position: relative;
         }
 
         .dropdown-content {
             display: none;
             position: absolute;
             background-color: #1c1c1c;
-            border: 1px solid #FFD700;
-            padding: 10px;
-            top: 100%;
-            left: 0;
-            z-index: 1;
-            border-radius: 8px;
             min-width: 200px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .tab:hover .dropdown-content {
-            display: block;
-        }
-
-        .dropdown-content button, .dropdown-content input {
-            background-color: transparent;
-            color: #FFD700;
-            border: none;
-            padding: 8px 12px;
-            cursor: pointer;
-            display: block;
-            width: 100%;
-            text-align: left;
-            transition: background-color 0.3s;
-            margin: 5px 0;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            z-index: 1;
+            border: 1px solid #FFD700;
             border-radius: 4px;
         }
 
-        .dropdown-content button:hover, .dropdown-content input:hover {
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        .dropdown-item {
+            color: #FFD700;
+            padding: 8px 12px;
+            text-decoration: none;
+            display: block;
+            cursor: pointer;
+        }
+
+        .dropdown-item:hover {
             background-color: #333;
         }
 
-        .dropdown-content input[type="file"] {
-            display: none;
-        }
-
-        .dropdown-content label {
-            display: block;
-            width: 100%;
-            cursor: pointer;
-        }
-
-        /* Go Button */
-        .go-button {
-            background-color: #00FF00;
-            color: #121212;
-            border: 2px solid #00CC00;
-            padding: 12px 24px;
-            cursor: pointer;
-            border-radius: 8px;
-            font-weight: bold;
-            transition: background-color 0.3s, transform 0.2s;
-            box-shadow: 0 4px 6px rgba(0, 255, 0, 0.2);
-        }
-
-        .go-button:hover {
-            background-color: #00CC00;
-            transform: scale(1.05);
-        }
-
-        /* Left Panel */
-        .left-panel {
-            width: 100%;
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
             background-color: #1c1c1c;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1;
-            position: relative;
         }
 
+        /* Queue Table */
         .queue-table {
-            background-color: #292929;
-            border: 1px solid #555;
             width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background-color: #292929;
             border-radius: 8px;
-            color: #ffffff;
-            margin-top: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
         }
 
         .queue-table th, .queue-table td {
-            padding: 8px;
+            padding: 12px 15px;
             text-align: left;
+            border-bottom: 1px solid #444;
         }
 
-        .queue-item.active {
+        .queue-table th {
+            background-color: #333;
+            color: #FFD700;
+        }
+
+        /* Track Items */
+        .track-item {
+            transition: background-color 0.2s;
+        }
+
+        .track-item:hover {
+            background-color: #333;
+        }
+
+        .track-item.active {
             background-color: #FFD700;
             color: #121212;
+        }
+
+        .track-item.active .track-number,
+        .track-item.active .play-btn,
+        .track-item.active .time-left {
+            color: #121212;
+        }
+
+        /* Track Controls */
+        .track-number {
+            cursor: pointer;
+            color: #FFD700;
             font-weight: bold;
         }
 
-        .queue-item.active .play-pause-button {
-            color: #121212;
-        }
-
-        .queue-item.active .progress-bar-fill {
-            background-color: #121212;
-        }
-
-        .queue-item.next-track .progress-bar-fill {
-            background-color: rgba(255, 215, 0, 0.5);
+        .play-btn {
+            background: none;
+            border: none;
+            color: #FFD700;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 5px;
         }
 
         /* Progress Bar */
         .progress-container {
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 10px;
             width: 100%;
         }
 
         .progress-bar {
             flex-grow: 1;
-            height: 5px;
-            background-color: #555;
-            border-radius: 2px;
+            height: 6px;
+            background-color: #444;
+            border-radius: 3px;
             overflow: hidden;
-            margin-top: 5px;
-            position: relative;
         }
 
-        .progress-bar-fill {
+        .progress-fill {
             height: 100%;
             background-color: #4CAF50;
             width: 0%;
@@ -171,302 +162,292 @@
         }
 
         .time-left {
-            font-size: 0.8em;
             color: #aaa;
+            font-size: 14px;
             min-width: 50px;
             text-align: right;
         }
 
-        /* Play/Pause Button */
-        .play-pause-button {
-            background-color: transparent;
-            border: none;
-            color: #FFD700;
-            cursor: pointer;
-            font-size: 1.2em;
-            transition: color 0.3s;
-            width: 100%;
-            text-align: left;
-        }
-
-        .play-pause-button:hover {
-            color: #ffffff;
-        }
-
-        /* Notes Input */
-        .notes-input {
-            background-color: #333;
-            border: 1px solid #555;
-            color: #ffffff;
-            padding: 5px;
-            border-radius: 4px;
-            width: 100%;
-            transition: border-color 0.3s;
-        }
-
-        .notes-input:focus {
-            border-color: #FFD700;
-            outline: none;
-        }
-
-        /* Track number editing */
-        .track-number {
-            cursor: pointer;
-        }
-
-        .track-number-input {
-            background-color: #333;
-            border: 1px solid #FFD700;
-            color: #ffffff;
-            width: 30px;
-            text-align: center;
-            border-radius: 4px;
-        }
-
         /* Action Buttons */
-        .action-button {
-            background-color: transparent;
+        .action-btn {
+            background: none;
             border: none;
             color: #FFD700;
             cursor: pointer;
-            font-size: 1em;
             margin: 0 5px;
-            transition: color 0.3s;
+            font-size: 14px;
         }
 
-        .action-button:hover {
-            color: #ffffff;
-        }
-
-        /* Waveform container */
+        /* Waveform Display */
         #waveform {
             margin-top: 20px;
+            background-color: #292929;
             border-radius: 8px;
-            background: #292929;
-            padding: 10px;
+            padding: 15px;
         }
 
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .go-button {
-                position: static;
-                margin-top: 10px;
-            }
+        /* Main Control Button */
+        .main-control {
+            background-color: #00AA00;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .main-control:hover {
+            background-color: #00CC00;
+            transform: scale(1.05);
+        }
+
+        /* Hidden file inputs */
+        .hidden-file-input {
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="top-bar">
-        <div class="tab" role="button" aria-label="Files Menu">
-            Files
+        <div class="dropdown">
+            <button class="dropdown-btn">Files</button>
             <div class="dropdown-content">
-                <label for="fileInput" style="cursor: pointer;">Import Music</label>
-                <input type="file" id="fileInput" multiple accept="audio/*" aria-label="Upload audio files">
-                <button onclick="exportProject()">Export Project</button>
-                <label for="importProjectInput" style="cursor: pointer;">Load Project</label>
-                <input type="file" id="importProjectInput" accept=".json">
+                <label class="dropdown-item" for="import-music">Import Music</label>
+                <input type="file" id="import-music" class="hidden-file-input" multiple accept="audio/*">
+                <div class="dropdown-item" onclick="exportProject()">Export Project</div>
+                <label class="dropdown-item" for="load-project">Load Project</label>
+                <input type="file" id="load-project" class="hidden-file-input" accept=".json">
             </div>
         </div>
-        <div class="tab" role="button" aria-label="Edit Menu">
-            Edit
+
+        <div class="dropdown">
+            <button class="dropdown-btn">Edit</button>
             <div class="dropdown-content">
-                <button onclick="renumberQueue()">Renumber Queue</button>
-                <button onclick="deleteCurrentTrack()">Delete Current Track</button>
-                <button onclick="goBackOneStep()">Go Back One Step</button>
+                <div class="dropdown-item" onclick="renumberQueue()">Renumber Queue</div>
+                <div class="dropdown-item" onclick="deleteCurrentTrack()">Delete Current Track</div>
+                <div class="dropdown-item" onclick="goBackOneStep()">Go Back One Step</div>
             </div>
         </div>
-        <button class="go-button" onclick="playNextTrackSimultaneously()" aria-label="Play next track">Go</button>
+
+        <button class="main-control" onclick="playNextTrack()">GO</button>
     </div>
 
-    <div class="left-panel">
-        <table class="queue-table" id="queueList">
+    <div class="main-content">
+        <table class="queue-table" id="queue-table">
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th width="50px">#</th>
                     <th>Track Name</th>
-                    <th>Play/Pause</th>
+                    <th width="80px">Play</th>
                     <th>Notes</th>
                     <th>Progress</th>
-                    <th>Actions</th>
+                    <th width="100px">Actions</th>
                 </tr>
             </thead>
-            <tbody>
-                <!-- Rows will be populated dynamically -->
+            <tbody id="queue-body">
+                <!-- Tracks will be added here dynamically -->
             </tbody>
         </table>
-        
+
         <div id="waveform"></div>
     </div>
 
     <script>
+        // Application state
         let tracks = [];
+        let currentTrackIndex = -1;
+        let nextTrackIndex = -1;
         let wavesurfer = null;
-        let currentIndex = -1;
-        let nextIndex = -1;
-        let interval = null;
-        let history = [];
+        let updateInterval = null;
+        let historyStack = [];
 
         // Initialize the application
-        document.addEventListener('DOMContentLoaded', () => {
-            // Load any saved data from localStorage
+        function init() {
+            loadFromLocalStorage();
+            setupEventListeners();
+            renderQueue();
+        }
+
+        // Load saved data from localStorage
+        function loadFromLocalStorage() {
             const savedData = localStorage.getItem('soundQueueData');
             if (savedData) {
                 try {
                     tracks = JSON.parse(savedData);
-                    updateQueueList();
+                    // Convert base64 data back to File objects
+                    tracks.forEach(track => {
+                        if (track.fileData) {
+                            const blob = dataURItoBlob(track.fileData);
+                            track.file = new File([blob], track.name, { type: blob.type });
+                        }
+                    });
                 } catch (e) {
                     console.error("Error loading saved data:", e);
                 }
             }
-        });
-
-        // Save the current state
-        function saveState() {
-            history.push(JSON.stringify(tracks));
-            if (history.length > 10) {
-                history.shift();
-            }
-            localStorage.setItem('soundQueueData', JSON.stringify(tracks));
         }
 
-        // Handle file input changes
-        document.getElementById('fileInput').addEventListener('change', async (event) => {
-            const files = Array.from(event.target.files);
-            if (files.length === 0) return;
+        // Save current state to localStorage
+        function saveToLocalStorage() {
+            // Convert File objects to base64 for storage
+            const tracksToSave = tracks.map(track => {
+                const trackCopy = {...track};
+                if (track.file && !track.fileData) {
+                    // This would need to be handled with FileReader in a real implementation
+                    // For now we'll just store basic info
+                    trackCopy.fileData = null;
+                    delete trackCopy.file;
+                }
+                return trackCopy;
+            });
+            localStorage.setItem('soundQueueData', JSON.stringify(tracksToSave));
+        }
+
+        // Push current state to history
+        function pushToHistory() {
+            historyStack.push(JSON.stringify(tracks));
+            if (historyStack.length > 10) {
+                historyStack.shift();
+            }
+        }
+
+        // Set up event listeners
+        function setupEventListeners() {
+            // File import
+            document.getElementById('import-music').addEventListener('change', handleFileImport);
+            document.getElementById('load-project').addEventListener('change', handleProjectImport);
             
-            saveState();
+            // Keyboard controls
+            document.addEventListener('keydown', handleKeyPress);
+        }
+
+        // Handle file import
+        async function handleFileImport(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
             
-            for (const file of files) {
+            pushToHistory();
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 if (!file.type.startsWith('audio/')) {
-                    alert(`File ${file.name} is not an audio file. Skipping.`);
+                    alert(`Skipping non-audio file: ${file.name}`);
                     continue;
                 }
                 
                 const track = {
                     id: tracks.length,
-                    name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
+                    name: file.name.replace(/\.[^/.]+$/, ""),
                     file: file,
                     notes: '',
                     duration: 0,
                     progress: 0,
-                    timeLeft: '0:00',
-                    fileData: null // Will store the audio data
+                    timeLeft: '0:00'
                 };
                 
-                // Read the file data
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    track.fileData = e.target.result;
-                    tracks.push(track);
-                    updateQueueList();
-                    saveState();
-                };
-                reader.readAsDataURL(file);
+                tracks.push(track);
             }
-        });
+            
+            event.target.value = ''; // Reset input
+            renderQueue();
+            saveToLocalStorage();
+        }
 
         // Handle project import
-        document.getElementById('importProjectInput').addEventListener('change', async (event) => {
+        async function handleProjectImport(event) {
             const file = event.target.files[0];
             if (!file) return;
             
-            saveState();
-            
             const reader = new FileReader();
-            reader.onload = async (e) => {
+            reader.onload = async function(e) {
                 try {
-                    const content = e.target.result;
-                    const importedTracks = JSON.parse(content);
+                    pushToHistory();
+                    const importedData = JSON.parse(e.target.result);
                     
-                    // Convert base64 strings back to File objects
-                    for (const track of importedTracks) {
+                    // Convert base64 data back to File objects
+                    for (const track of importedData) {
                         if (track.fileData) {
-                            const res = await fetch(track.fileData);
-                            const blob = await res.blob();
+                            const blob = dataURItoBlob(track.fileData);
                             track.file = new File([blob], track.name, { type: blob.type });
                         }
                     }
                     
-                    tracks = importedTracks;
-                    updateQueueList();
-                    saveState();
-                } catch (error) {
-                    console.error("Error loading project:", error);
-                    alert("Error loading project file. Please check the file format.");
-                }
-            };
-            reader.readAsText(file);
-        });
-
-        // Export project as a JSON file
-        function exportProject() {
-            saveState();
-            const projectData = JSON.stringify(tracks, null, 2);
-            const dataBlob = new Blob([projectData], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'sound_queue_project.json';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        // Renumber the queue
-        function renumberQueue() {
-            saveState();
-            tracks.forEach((track, index) => {
-                track.id = index;
-            });
-            updateQueueList();
-        }
-
-        // Delete current track
-        function deleteCurrentTrack() {
-            if (currentIndex >= 0 && currentIndex < tracks.length) {
-                saveState();
-                tracks.splice(currentIndex, 1);
-                if (currentIndex >= tracks.length) {
-                    currentIndex = tracks.length - 1;
-                }
-                updateQueueList();
-                
-                if (tracks.length > 0 && wavesurfer) {
-                    playTrack(currentIndex);
-                } else if (wavesurfer) {
-                    wavesurfer.destroy();
-                    wavesurfer = null;
-                }
-            }
-        }
-
-        // Go back one step in history
-        function goBackOneStep() {
-            if (history.length > 0) {
-                const previousState = history.pop();
-                try {
-                    tracks = JSON.parse(previousState);
-                    updateQueueList();
+                    tracks = importedData;
+                    currentTrackIndex = -1;
+                    nextTrackIndex = -1;
                     
-                    if (currentIndex >= 0 && currentIndex < tracks.length && wavesurfer) {
-                        playTrack(currentIndex);
-                    } else if (wavesurfer) {
+                    if (wavesurfer) {
                         wavesurfer.destroy();
                         wavesurfer = null;
                     }
-                } catch (e) {
-                    console.error("Error restoring state:", e);
+                    
+                    renderQueue();
+                    saveToLocalStorage();
+                } catch (error) {
+                    console.error("Error loading project:", error);
+                    alert("Failed to load project file. Please check the file format.");
                 }
-            }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
         }
 
-        // Update the queue list UI
-        function updateQueueList() {
-            const queueList = document.querySelector('#queueList tbody');
-            queueList.innerHTML = '';
+        // Export project
+        function exportProject() {
+            // Convert File objects to base64 for export
+            Promise.all(tracks.map(track => {
+                return new Promise(resolve => {
+                    if (track.file && !track.fileData) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            track.fileData = e.target.result;
+                            resolve({...track});
+                        };
+                        reader.readAsDataURL(track.file);
+                    } else {
+                        resolve({...track});
+                    }
+                });
+            })).then(tracksToExport => {
+                const dataStr = JSON.stringify(tracksToExport, null, 2);
+                const blob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'sound-queue-project.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // Helper function to convert data URI to Blob
+        function dataURItoBlob(dataURI) {
+            const byteString = atob(dataURI.split(',')[1]);
+            const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            
+            for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+            }
+            
+            return new Blob([ab], {type: mimeString});
+        }
+
+        // Render the queue
+        function renderQueue() {
+            const queueBody = document.getElementById('queue-body');
+            queueBody.innerHTML = '';
+            
             tracks.forEach((track, index) => {
                 const row = document.createElement('tr');
-                row.className = index === currentIndex ? 'queue-item active' : 
-                                index === nextIndex ? 'queue-item next-track' : 'queue-item';
+                row.className = `track-item ${index === currentTrackIndex ? 'active' : ''}`;
                 
                 row.innerHTML = `
                     <td>
@@ -474,132 +455,102 @@
                     </td>
                     <td>${track.name}</td>
                     <td>
-                        <button class="play-pause-button" onclick="toggleTrack(${index})" aria-label="Play/Pause track">
-                            <i class="fas ${wavesurfer && currentIndex === index && wavesurfer.isPlaying() ? 'fa-pause' : 'fa-play'}"></i>
+                        <button class="play-btn" onclick="toggleTrack(${index})">
+                            <i class="fas ${index === currentTrackIndex && wavesurfer?.isPlaying() ? 'fa-pause' : 'fa-play'}"></i>
                         </button>
                     </td>
                     <td>
-                        <input type="text" class="notes-input" placeholder="Add notes..." 
-                               onchange="updateNotes(${index}, this.value)" value="${track.notes}" 
-                               aria-label="Track notes">
+                        <input type="text" class="notes-input" value="${track.notes}" 
+                               onchange="updateTrackNotes(${index}, this.value)">
                     </td>
                     <td>
                         <div class="progress-container">
                             <div class="progress-bar">
-                                <div class="progress-bar-fill" style="width: ${track.progress}%"></div>
+                                <div class="progress-fill" style="width: ${track.progress}%"></div>
                             </div>
                             <span class="time-left">${track.timeLeft}</span>
                         </div>
                     </td>
                     <td>
-                        <button class="action-button" onclick="deleteTrack(${index})" title="Delete track">
+                        <button class="action-btn" onclick="deleteTrack(${index})" title="Delete">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 `;
-                queueList.appendChild(row);
+                
+                queueBody.appendChild(row);
             });
-        }
-
-        // Delete a specific track
-        function deleteTrack(index) {
-            if (index >= 0 && index < tracks.length) {
-                saveState();
-                tracks.splice(index, 1);
-                
-                if (currentIndex === index) {
-                    // If we're deleting the currently playing track
-                    if (wavesurfer) {
-                        wavesurfer.destroy();
-                        wavesurfer = null;
-                    }
-                    currentIndex = -1;
-                } else if (currentIndex > index) {
-                    currentIndex--;
-                }
-                
-                updateQueueList();
-            }
         }
 
         // Edit track number
         function editTrackNumber(index) {
-            const cell = document.querySelector(`#queueList tbody tr:nth-child(${index + 1}) td:first-child`);
+            const cell = document.querySelector(`#queue-body tr:nth-child(${index + 1}) td:first-child`);
             if (!cell) return;
             
-            const currentNumber = index + 1;
             cell.innerHTML = `
-                <input type="number" class="track-number-input" value="${currentNumber}" 
-                       min="1" max="${tracks.length}" 
+                <input type="number" value="${index + 1}" min="1" max="${tracks.length}"
                        onblur="saveTrackNumber(${index}, this.value)"
-                       onkeydown="handleTrackNumberKey(event, ${index}, this)">
+                       onkeydown="if(event.key === 'Enter') this.blur()">
             `;
             
             const input = cell.querySelector('input');
-            input.select();
             input.focus();
+            input.select();
         }
 
-        // Save track number after editing
-        function saveTrackNumber(oldIndex, newNumber) {
-            newNumber = parseInt(newNumber);
-            if (isNaN(newNumber)) {
-                updateQueueList();
+        // Save track number after edit
+        function saveTrackNumber(oldIndex, newIndexStr) {
+            const newIndex = parseInt(newIndexStr) - 1;
+            if (isNaN(newIndex) || newIndex === oldIndex) {
+                renderQueue();
                 return;
             }
             
-            newNumber = Math.max(1, Math.min(tracks.length, newNumber)) - 1;
-            if (newNumber === oldIndex) {
-                updateQueueList();
-                return;
+            pushToHistory();
+            
+            // Clamp the new index to valid range
+            const clampedIndex = Math.max(0, Math.min(tracks.length - 1, newIndex));
+            
+            // Move the track
+            const [movedTrack] = tracks.splice(oldIndex, 1);
+            tracks.splice(clampedIndex, 0, movedTrack);
+            
+            // Update current track index if needed
+            if (currentTrackIndex === oldIndex) {
+                currentTrackIndex = clampedIndex;
+            } else if (currentTrackIndex > oldIndex && currentTrackIndex <= clampedIndex) {
+                currentTrackIndex--;
+            } else if (currentTrackIndex < oldIndex && currentTrackIndex >= clampedIndex) {
+                currentTrackIndex++;
             }
             
-            saveState();
-            
-            const trackToMove = tracks.splice(oldIndex, 1)[0];
-            tracks.splice(newNumber, 0, trackToMove);
-            
-            if (currentIndex === oldIndex) {
-                currentIndex = newNumber;
-            } else if (currentIndex > oldIndex && currentIndex <= newNumber) {
-                currentIndex--;
-            } else if (currentIndex < oldIndex && currentIndex >= newNumber) {
-                currentIndex++;
+            // Update next track index if needed
+            if (nextTrackIndex === oldIndex) {
+                nextTrackIndex = clampedIndex;
+            } else if (nextTrackIndex > oldIndex && nextTrackIndex <= clampedIndex) {
+                nextTrackIndex--;
+            } else if (nextTrackIndex < oldIndex && nextTrackIndex >= clampedIndex) {
+                nextTrackIndex++;
             }
             
-            if (nextIndex === oldIndex) {
-                nextIndex = newNumber;
-            } else if (nextIndex > oldIndex && nextIndex <= newNumber) {
-                nextIndex--;
-            } else if (nextIndex < oldIndex && nextIndex >= newNumber) {
-                nextIndex++;
-            }
+            renderQueue();
+            saveToLocalStorage();
             
-            updateQueueList();
-            
-            // If we moved the currently playing track, restart it
-            if (currentIndex === newNumber && wavesurfer) {
-                playTrack(currentIndex);
-            }
-        }
-
-        // Handle keyboard events for track number editing
-        function handleTrackNumberKey(event, index, input) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                input.blur();
+            // Restart current track if it was moved
+            if (currentTrackIndex === clampedIndex && wavesurfer) {
+                playTrack(currentTrackIndex);
             }
         }
 
         // Update track notes
-        function updateNotes(index, value) {
-            tracks[index].notes = value;
-            saveState();
+        function updateTrackNotes(index, notes) {
+            tracks[index].notes = notes;
+            saveToLocalStorage();
         }
 
-        // Toggle play/pause for a track
+        // Toggle track play/pause
         function toggleTrack(index) {
-            if (currentIndex === index && wavesurfer) {
+            if (index === currentTrackIndex && wavesurfer) {
                 if (wavesurfer.isPlaying()) {
                     wavesurfer.pause();
                 } else {
@@ -608,44 +559,26 @@
             } else {
                 playTrack(index);
             }
-            updateQueueList();
-        }
-
-        // Play the next track simultaneously
-        function playNextTrackSimultaneously() {
-            if (currentIndex + 1 < tracks.length) {
-                nextIndex = currentIndex + 1;
-                updateQueueList();
-            } else {
-                alert("No more tracks in the queue.");
-            }
+            renderQueue();
         }
 
         // Play a specific track
         function playTrack(index) {
             if (index < 0 || index >= tracks.length) return;
             
+            // Stop current playback
             if (wavesurfer) {
                 wavesurfer.destroy();
-                clearInterval(interval);
+                clearInterval(updateInterval);
             }
-
-            currentIndex = index;
-            nextIndex = -1;
-            updateQueueList();
-
-            const track = tracks[index];
-            let audioSrc;
             
-            if (track.fileData) {
-                audioSrc = track.fileData;
-            } else if (track.file) {
-                audioSrc = URL.createObjectURL(track.file);
-            } else {
-                console.error("No audio source available for track:", track);
-                return;
-            }
-
+            currentTrackIndex = index;
+            nextTrackIndex = -1;
+            renderQueue();
+            
+            const track = tracks[index];
+            const audioSrc = track.file ? URL.createObjectURL(track.file) : track.fileData;
+            
             wavesurfer = WaveSurfer.create({
                 container: '#waveform',
                 waveColor: '#555',
@@ -656,97 +589,187 @@
                 height: 80,
                 responsive: true
             });
-
+            
             wavesurfer.load(audioSrc);
-
+            
             wavesurfer.on('ready', () => {
                 track.duration = wavesurfer.getDuration();
                 wavesurfer.play();
-                updateQueueList();
                 startProgressUpdate();
+                renderQueue();
             });
-
+            
             wavesurfer.on('finish', () => {
                 stopProgressUpdate();
-                if (nextIndex >= 0) {
-                    playTrack(nextIndex);
-                } else if (currentIndex + 1 < tracks.length) {
-                    playTrack(currentIndex + 1);
+                if (nextTrackIndex >= 0) {
+                    playTrack(nextTrackIndex);
+                } else if (currentTrackIndex + 1 < tracks.length) {
+                    playTrack(currentTrackIndex + 1);
                 }
             });
-
+            
             wavesurfer.on('error', (error) => {
-                console.error("Error loading track:", error);
-                alert("Error loading track. Please check the file format.");
+                console.error("WaveSurfer error:", error);
+                alert("Error playing track. Please check the audio file.");
             });
         }
 
-        // Start updating progress
+        // Play next track
+        function playNextTrack() {
+            if (currentTrackIndex + 1 < tracks.length) {
+                nextTrackIndex = currentTrackIndex + 1;
+                renderQueue();
+            } else {
+                alert("End of queue reached");
+            }
+        }
+
+        // Start progress update timer
         function startProgressUpdate() {
             stopProgressUpdate();
-            interval = setInterval(() => {
-                if (wavesurfer && currentIndex >= 0) {
+            updateInterval = setInterval(() => {
+                if (wavesurfer && currentTrackIndex >= 0) {
                     const currentTime = wavesurfer.getCurrentTime();
                     const duration = wavesurfer.getDuration();
                     const progress = (currentTime / duration) * 100;
-                    tracks[currentIndex].progress = progress;
                     
+                    // Update track progress
+                    const track = tracks[currentTrackIndex];
+                    track.progress = progress;
+                    
+                    // Calculate time left
                     const timeLeft = duration - currentTime;
                     const minutes = Math.floor(timeLeft / 60);
                     const seconds = Math.floor(timeLeft % 60);
-                    tracks[currentIndex].timeLeft = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+                    track.timeLeft = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
                     
-                    const row = document.querySelector(`#queueList tbody tr:nth-child(${currentIndex + 1})`);
-                    if (row) {
-                        const progressBar = row.querySelector('.progress-bar-fill');
-                        const timeLeftElement = row.querySelector('.time-left');
-                        if (progressBar) progressBar.style.width = `${progress}%`;
-                        if (timeLeftElement) timeLeftElement.textContent = tracks[currentIndex].timeLeft;
-                    }
+                    // Update UI
+                    const progressBar = document.querySelector(
+                        `#queue-body tr:nth-child(${currentTrackIndex + 1}) .progress-fill`
+                    );
+                    const timeDisplay = document.querySelector(
+                        `#queue-body tr:nth-child(${currentTrackIndex + 1}) .time-left`
+                    );
+                    
+                    if (progressBar) progressBar.style.width = `${progress}%`;
+                    if (timeDisplay) timeDisplay.textContent = track.timeLeft;
                 }
             }, 100);
         }
 
-        // Stop updating progress
+        // Stop progress update timer
         function stopProgressUpdate() {
-            if (interval) {
-                clearInterval(interval);
-                interval = null;
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
             }
         }
 
-        // Keyboard controls
-        document.addEventListener('keydown', (event) => {
-            if (event.target.tagName.toLowerCase() !== 'input' || event.target.classList.contains('track-number-input')) {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    if (event.target.classList.contains('track-number-input')) {
-                        event.target.blur();
-                    } else {
-                        playNextTrackSimultaneously();
-                    }
+        // Delete a track
+        function deleteTrack(index) {
+            if (index < 0 || index >= tracks.length) return;
+            
+            pushToHistory();
+            
+            // Stop playback if deleting current track
+            if (index === currentTrackIndex) {
+                if (wavesurfer) {
+                    wavesurfer.destroy();
+                    wavesurfer = null;
                 }
-                
-                if (event.key === ' ') {
+                currentTrackIndex = -1;
+            } else if (index < currentTrackIndex) {
+                currentTrackIndex--;
+            }
+            
+            // Adjust next track index if needed
+            if (nextTrackIndex === index) {
+                nextTrackIndex = -1;
+            } else if (nextTrackIndex > index) {
+                nextTrackIndex--;
+            }
+            
+            tracks.splice(index, 1);
+            renderQueue();
+            saveToLocalStorage();
+        }
+
+        // Delete current track
+        function deleteCurrentTrack() {
+            if (currentTrackIndex >= 0) {
+                deleteTrack(currentTrackIndex);
+            }
+        }
+
+        // Renumber queue sequentially
+        function renumberQueue() {
+            pushToHistory();
+            tracks.forEach((track, index) => {
+                track.id = index;
+            });
+            renderQueue();
+            saveToLocalStorage();
+        }
+
+        // Undo last action
+        function goBackOneStep() {
+            if (historyStack.length > 0) {
+                const previousState = historyStack.pop();
+                try {
+                    const previousTracks = JSON.parse(previousState);
+                    tracks = previousTracks;
+                    
+                    // Reset playback if current track no longer exists
+                    if (currentTrackIndex >= tracks.length) {
+                        currentTrackIndex = -1;
+                        if (wavesurfer) {
+                            wavesurfer.destroy();
+                            wavesurfer = null;
+                        }
+                    }
+                    
+                    renderQueue();
+                    saveToLocalStorage();
+                } catch (e) {
+                    console.error("Error restoring state:", e);
+                }
+            }
+        }
+
+        // Handle keyboard input
+        function handleKeyPress(event) {
+            // Don't interfere with text inputs
+            if (event.target.tagName === 'INPUT') return;
+            
+            switch (event.key) {
+                case 'Enter':
                     event.preventDefault();
-                    if (currentIndex >= 0) {
-                        toggleTrack(currentIndex);
+                    playNextTrack();
+                    break;
+                    
+                case ' ':
+                    event.preventDefault();
+                    if (currentTrackIndex >= 0) {
+                        toggleTrack(currentTrackIndex);
                     } else if (tracks.length > 0) {
                         playTrack(0);
                     }
-                }
-                
-                if (event.key === 'Delete') {
-                    if (currentIndex >= 0) {
-                        deleteCurrentTrack();
-                    }
-                }
-                
-                if (event.key === 'Backspace') {
+                    break;
+                    
+                case 'Delete':
+                    event.preventDefault();
+                    deleteCurrentTrack();
+                    break;
+                    
+                case 'Backspace':
+                    event.preventDefault();
                     goBackOneStep();
-                }
+                    break;
             }
-        });
+        }
+
+        // Initialize the application when loaded
+        window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>
