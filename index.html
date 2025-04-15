@@ -79,13 +79,15 @@
             padding: 20px;
             overflow-y: auto;
             background-color: #1c1c1c;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Queue Table */
         .queue-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
+            margin-bottom: 20px;
             background-color: #292929;
             border-radius: 8px;
             overflow: hidden;
@@ -168,13 +170,21 @@
             text-align: right;
         }
 
-        /* Action Buttons */
-        .action-btn {
-            background: none;
-            border: none;
-            color: #FFD700;
-            cursor: pointer;
-            margin: 0 5px;
+        /* Notes Input */
+        .notes-container {
+            margin-top: 20px;
+            background-color: #292929;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .notes-input {
+            width: 100%;
+            padding: 10px;
+            background-color: #121212;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 4px;
             font-size: 14px;
         }
 
@@ -242,15 +252,17 @@
                     <th width="50px">#</th>
                     <th>Track Name</th>
                     <th width="80px">Play</th>
-                    <th>Notes</th>
                     <th>Progress</th>
-                    <th width="100px">Actions</th>
                 </tr>
             </thead>
             <tbody id="queue-body">
                 <!-- Tracks will be added here dynamically -->
             </tbody>
         </table>
+
+        <div class="notes-container">
+            <textarea class="notes-input" id="global-notes" placeholder="Add notes here..."></textarea>
+        </div>
 
         <div id="waveform"></div>
     </div>
@@ -263,6 +275,7 @@
         let wavesurfer = null;
         let updateInterval = null;
         let historyStack = [];
+        let selectedTrackIndex = -1; // For keyboard navigation
 
         // Initialize the application
         function init() {
@@ -276,14 +289,9 @@
             const savedData = localStorage.getItem('soundQueueData');
             if (savedData) {
                 try {
-                    tracks = JSON.parse(savedData);
-                    // Convert base64 data back to File objects
-                    tracks.forEach(track => {
-                        if (track.fileData) {
-                            const blob = dataURItoBlob(track.fileData);
-                            track.file = new File([blob], track.name, { type: blob.type });
-                        }
-                    });
+                    const savedState = JSON.parse(savedData);
+                    tracks = savedState.tracks || [];
+                    document.getElementById('global-notes').value = savedState.notes || '';
                 } catch (e) {
                     console.error("Error loading saved data:", e);
                 }
@@ -292,23 +300,19 @@
 
         // Save current state to localStorage
         function saveToLocalStorage() {
-            // Convert File objects to base64 for storage
-            const tracksToSave = tracks.map(track => {
-                const trackCopy = {...track};
-                if (track.file && !track.fileData) {
-                    // This would need to be handled with FileReader in a real implementation
-                    // For now we'll just store basic info
-                    trackCopy.fileData = null;
-                    delete trackCopy.file;
-                }
-                return trackCopy;
-            });
-            localStorage.setItem('soundQueueData', JSON.stringify(tracksToSave));
+            const state = {
+                tracks: tracks,
+                notes: document.getElementById('global-notes').value
+            };
+            localStorage.setItem('soundQueueData', JSON.stringify(state));
         }
 
         // Push current state to history
         function pushToHistory() {
-            historyStack.push(JSON.stringify(tracks));
+            historyStack.push(JSON.stringify({
+                tracks: [...tracks],
+                notes: document.getElementById('global-notes').value
+            }));
             if (historyStack.length > 10) {
                 historyStack.shift();
             }
@@ -320,12 +324,15 @@
             document.getElementById('import-music').addEventListener('change', handleFileImport);
             document.getElementById('load-project').addEventListener('change', handleProjectImport);
             
+            // Notes input
+            document.getElementById('global-notes').addEventListener('change', saveToLocalStorage);
+            
             // Keyboard controls
             document.addEventListener('keydown', handleKeyPress);
         }
 
         // Handle file import
-        async function handleFileImport(event) {
+        function handleFileImport(event) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
             
@@ -342,7 +349,6 @@
                     id: tracks.length,
                     name: file.name.replace(/\.[^/.]+$/, ""),
                     file: file,
-                    notes: '',
                     duration: 0,
                     progress: 0,
                     timeLeft: '0:00'
@@ -357,25 +363,18 @@
         }
 
         // Handle project import
-        async function handleProjectImport(event) {
+        function handleProjectImport(event) {
             const file = event.target.files[0];
             if (!file) return;
             
             const reader = new FileReader();
-            reader.onload = async function(e) {
+            reader.onload = function(e) {
                 try {
                     pushToHistory();
                     const importedData = JSON.parse(e.target.result);
                     
-                    // Convert base64 data back to File objects
-                    for (const track of importedData) {
-                        if (track.fileData) {
-                            const blob = dataURItoBlob(track.fileData);
-                            track.file = new File([blob], track.name, { type: blob.type });
-                        }
-                    }
-                    
-                    tracks = importedData;
+                    tracks = importedData.tracks || [];
+                    document.getElementById('global-notes').value = importedData.notes || '';
                     currentTrackIndex = -1;
                     nextTrackIndex = -1;
                     
@@ -397,47 +396,22 @@
 
         // Export project
         function exportProject() {
-            // Convert File objects to base64 for export
-            Promise.all(tracks.map(track => {
-                return new Promise(resolve => {
-                    if (track.file && !track.fileData) {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            track.fileData = e.target.result;
-                            resolve({...track});
-                        };
-                        reader.readAsDataURL(track.file);
-                    } else {
-                        resolve({...track});
-                    }
-                });
-            })).then(tracksToExport => {
-                const dataStr = JSON.stringify(tracksToExport, null, 2);
-                const blob = new Blob([dataStr], {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'sound-queue-project.json';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            });
-        }
-
-        // Helper function to convert data URI to Blob
-        function dataURItoBlob(dataURI) {
-            const byteString = atob(dataURI.split(',')[1]);
-            const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-            const ab = new ArrayBuffer(byteString.length);
-            const ia = new Uint8Array(ab);
+            const data = {
+                tracks: tracks,
+                notes: document.getElementById('global-notes').value
+            };
             
-            for (let i = 0; i < byteString.length; i++) {
-                ia[i] = byteString.charCodeAt(i);
-            }
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
             
-            return new Blob([ab], {type: mimeString});
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sound-queue-project.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         // Render the queue
@@ -447,21 +421,18 @@
             
             tracks.forEach((track, index) => {
                 const row = document.createElement('tr');
-                row.className = `track-item ${index === currentTrackIndex ? 'active' : ''}`;
+                row.className = `track-item ${index === currentTrackIndex ? 'active' : ''} ${index === selectedTrackIndex ? 'selected' : ''}`;
+                row.tabIndex = 0; // Make rows focusable
                 
                 row.innerHTML = `
                     <td>
-                        <span class="track-number" onclick="editTrackNumber(${index})">${index + 1}</span>
+                        <span class="track-number">${index + 1}</span>
                     </td>
                     <td>${track.name}</td>
                     <td>
                         <button class="play-btn" onclick="toggleTrack(${index})">
                             <i class="fas ${index === currentTrackIndex && wavesurfer?.isPlaying() ? 'fa-pause' : 'fa-play'}"></i>
                         </button>
-                    </td>
-                    <td>
-                        <input type="text" class="notes-input" value="${track.notes}" 
-                               onchange="updateTrackNotes(${index}, this.value)">
                     </td>
                     <td>
                         <div class="progress-container">
@@ -471,81 +442,24 @@
                             <span class="time-left">${track.timeLeft}</span>
                         </div>
                     </td>
-                    <td>
-                        <button class="action-btn" onclick="deleteTrack(${index})" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
                 `;
+                
+                // Add click handler for the entire row
+                row.addEventListener('click', () => {
+                    selectedTrackIndex = index;
+                    renderQueue();
+                });
                 
                 queueBody.appendChild(row);
             });
-        }
-
-        // Edit track number
-        function editTrackNumber(index) {
-            const cell = document.querySelector(`#queue-body tr:nth-child(${index + 1}) td:first-child`);
-            if (!cell) return;
             
-            cell.innerHTML = `
-                <input type="number" value="${index + 1}" min="1" max="${tracks.length}"
-                       onblur="saveTrackNumber(${index}, this.value)"
-                       onkeydown="if(event.key === 'Enter') this.blur()">
-            `;
-            
-            const input = cell.querySelector('input');
-            input.focus();
-            input.select();
-        }
-
-        // Save track number after edit
-        function saveTrackNumber(oldIndex, newIndexStr) {
-            const newIndex = parseInt(newIndexStr) - 1;
-            if (isNaN(newIndex) || newIndex === oldIndex) {
-                renderQueue();
-                return;
+            // Focus the selected track if there is one
+            if (selectedTrackIndex >= 0 && selectedTrackIndex < tracks.length) {
+                const rows = queueBody.querySelectorAll('tr');
+                if (rows[selectedTrackIndex]) {
+                    rows[selectedTrackIndex].focus();
+                }
             }
-            
-            pushToHistory();
-            
-            // Clamp the new index to valid range
-            const clampedIndex = Math.max(0, Math.min(tracks.length - 1, newIndex));
-            
-            // Move the track
-            const [movedTrack] = tracks.splice(oldIndex, 1);
-            tracks.splice(clampedIndex, 0, movedTrack);
-            
-            // Update current track index if needed
-            if (currentTrackIndex === oldIndex) {
-                currentTrackIndex = clampedIndex;
-            } else if (currentTrackIndex > oldIndex && currentTrackIndex <= clampedIndex) {
-                currentTrackIndex--;
-            } else if (currentTrackIndex < oldIndex && currentTrackIndex >= clampedIndex) {
-                currentTrackIndex++;
-            }
-            
-            // Update next track index if needed
-            if (nextTrackIndex === oldIndex) {
-                nextTrackIndex = clampedIndex;
-            } else if (nextTrackIndex > oldIndex && nextTrackIndex <= clampedIndex) {
-                nextTrackIndex--;
-            } else if (nextTrackIndex < oldIndex && nextTrackIndex >= clampedIndex) {
-                nextTrackIndex++;
-            }
-            
-            renderQueue();
-            saveToLocalStorage();
-            
-            // Restart current track if it was moved
-            if (currentTrackIndex === clampedIndex && wavesurfer) {
-                playTrack(currentTrackIndex);
-            }
-        }
-
-        // Update track notes
-        function updateTrackNotes(index, notes) {
-            tracks[index].notes = notes;
-            saveToLocalStorage();
         }
 
         // Toggle track play/pause
@@ -577,7 +491,7 @@
             renderQueue();
             
             const track = tracks[index];
-            const audioSrc = track.file ? URL.createObjectURL(track.file) : track.fileData;
+            const audioSrc = URL.createObjectURL(track.file);
             
             wavesurfer = WaveSurfer.create({
                 container: '#waveform',
@@ -665,39 +579,29 @@
             }
         }
 
-        // Delete a track
-        function deleteTrack(index) {
-            if (index < 0 || index >= tracks.length) return;
-            
-            pushToHistory();
-            
-            // Stop playback if deleting current track
-            if (index === currentTrackIndex) {
+        // Delete current track
+        function deleteCurrentTrack() {
+            if (currentTrackIndex >= 0 && currentTrackIndex < tracks.length) {
+                pushToHistory();
+                
+                // Stop playback if deleting current track
                 if (wavesurfer) {
                     wavesurfer.destroy();
                     wavesurfer = null;
                 }
+                
+                tracks.splice(currentTrackIndex, 1);
+                
+                // Adjust selected track if needed
+                if (selectedTrackIndex === currentTrackIndex) {
+                    selectedTrackIndex = -1;
+                } else if (selectedTrackIndex > currentTrackIndex) {
+                    selectedTrackIndex--;
+                }
+                
                 currentTrackIndex = -1;
-            } else if (index < currentTrackIndex) {
-                currentTrackIndex--;
-            }
-            
-            // Adjust next track index if needed
-            if (nextTrackIndex === index) {
-                nextTrackIndex = -1;
-            } else if (nextTrackIndex > index) {
-                nextTrackIndex--;
-            }
-            
-            tracks.splice(index, 1);
-            renderQueue();
-            saveToLocalStorage();
-        }
-
-        // Delete current track
-        function deleteCurrentTrack() {
-            if (currentTrackIndex >= 0) {
-                deleteTrack(currentTrackIndex);
+                renderQueue();
+                saveToLocalStorage();
             }
         }
 
@@ -716,8 +620,9 @@
             if (historyStack.length > 0) {
                 const previousState = historyStack.pop();
                 try {
-                    const previousTracks = JSON.parse(previousState);
-                    tracks = previousTracks;
+                    const previousData = JSON.parse(previousState);
+                    tracks = previousData.tracks || [];
+                    document.getElementById('global-notes').value = previousData.notes || '';
                     
                     // Reset playback if current track no longer exists
                     if (currentTrackIndex >= tracks.length) {
@@ -726,6 +631,11 @@
                             wavesurfer.destroy();
                             wavesurfer = null;
                         }
+                    }
+                    
+                    // Reset selected track if it no longer exists
+                    if (selectedTrackIndex >= tracks.length) {
+                        selectedTrackIndex = -1;
                     }
                     
                     renderQueue();
@@ -739,12 +649,28 @@
         // Handle keyboard input
         function handleKeyPress(event) {
             // Don't interfere with text inputs
-            if (event.target.tagName === 'INPUT') return;
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
             
             switch (event.key) {
+                case 'Tab':
+                    event.preventDefault();
+                    if (tracks.length > 0) {
+                        if (selectedTrackIndex === -1) {
+                            selectedTrackIndex = 0;
+                        } else {
+                            selectedTrackIndex = (selectedTrackIndex + 1) % tracks.length;
+                        }
+                        renderQueue();
+                    }
+                    break;
+                    
                 case 'Enter':
                     event.preventDefault();
-                    playNextTrack();
+                    if (selectedTrackIndex >= 0) {
+                        playTrack(selectedTrackIndex);
+                    } else {
+                        playNextTrack();
+                    }
                     break;
                     
                 case ' ':
@@ -758,12 +684,30 @@
                     
                 case 'Delete':
                     event.preventDefault();
-                    deleteCurrentTrack();
+                    goBackOneStep();
                     break;
                     
                 case 'Backspace':
                     event.preventDefault();
-                    goBackOneStep();
+                    if (selectedTrackIndex >= 0) {
+                        pushToHistory();
+                        tracks.splice(selectedTrackIndex, 1);
+                        
+                        // Adjust current track index if needed
+                        if (currentTrackIndex === selectedTrackIndex) {
+                            currentTrackIndex = -1;
+                            if (wavesurfer) {
+                                wavesurfer.destroy();
+                                wavesurfer = null;
+                            }
+                        } else if (currentTrackIndex > selectedTrackIndex) {
+                            currentTrackIndex--;
+                        }
+                        
+                        selectedTrackIndex = -1;
+                        renderQueue();
+                        saveToLocalStorage();
+                    }
                     break;
             }
         }
